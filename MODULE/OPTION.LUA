@@ -5,38 +5,49 @@ local HEARTBEAT = RUNSERVICE.Heartbeat
 
 local MODULE = {}
 
-MODULE.CONNECT = (function()
-    local CONNECTIONS = _ENV.Connections or {}
+MODULE.CONNECTIONS = _ENV.Connections or {}
 
-    for I = 1, #CONNECTIONS do
-        CONNECTIONS[I]:Disconnect()
+for I = #MODULE.CONNECTIONS, 1, -1 do
+    local CONNECTION = MODULE.CONNECTIONS[I]
+
+    if CONNECTION then
+        pcall(function()
+            CONNECTION:Disconnect()
+        end)
     end
 
-    table.clear(CONNECTIONS)
-    _ENV.Connections = CONNECTIONS
+    MODULE.CONNECTIONS[I] = nil
+end
 
-    return function(INSTANCE, CALLBACK)
-        local CONNECTION = INSTANCE:Connect(CALLBACK)
+_ENV.Connections = MODULE.CONNECTIONS
 
-        table.insert(CONNECTIONS, CONNECTION)
+function MODULE.CONNECT(INSTANCE, CALLBACK)
+    local CONNECTION = INSTANCE:Connect(CALLBACK)
 
-        return CONNECTION
-    end
-end)()
+    table.insert(MODULE.CONNECTIONS, CONNECTION)
 
-local CONNECT = MODULE.CONNECT
+    return CONNECTION
+end
 
 function MODULE.NEWOPTION(FUNCTION, INTERVAL)
     INTERVAL = INTERVAL or 0.1
 
-    CONNECT(HEARTBEAT, function()
-        task.wait(INTERVAL)
+    local ELAPSED = 0
+
+    return MODULE.CONNECT(HEARTBEAT, function(DELTA)
+        ELAPSED += DELTA
+
+        if ELAPSED < INTERVAL then
+            return
+        end
+
+        ELAPSED = 0
 
         if FUNCTION then
             local SUCCESS, ERROR = pcall(FUNCTION)
 
             if not SUCCESS then
-                print(ERROR)
+                warn(ERROR)
             end
         end
     end)
