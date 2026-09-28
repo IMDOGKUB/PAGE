@@ -1,18 +1,18 @@
 local _ENV = (getgenv or getrenv or getfenv)()
 
-local RUNSERVICE = game:GetService("RunService")
-local HEARTBEAT = RUNSERVICE.Heartbeat
+local RunService = game:GetService("RunService")
 
 local MODULE = {}
 
+MODULE.OPTIONS = {}
 MODULE.CONNECTIONS = _ENV.Connections or {}
 
 for I = #MODULE.CONNECTIONS, 1, -1 do
-    local CONNECTION = MODULE.CONNECTIONS[I]
+    local Connection = MODULE.CONNECTIONS[I]
 
-    if CONNECTION then
+    if Connection then
         pcall(function()
-            CONNECTION:Disconnect()
+            Connection:Disconnect()
         end)
     end
 
@@ -21,36 +21,64 @@ end
 
 _ENV.Connections = MODULE.CONNECTIONS
 
-function MODULE.CONNECT(INSTANCE, CALLBACK)
-    local CONNECTION = INSTANCE:Connect(CALLBACK)
 
-    table.insert(MODULE.CONNECTIONS, CONNECTION)
+function MODULE.CONNECT(Event, Callback)
+    local Connection = Event:Connect(Callback)
 
-    return CONNECTION
+    table.insert(MODULE.CONNECTIONS, Connection)
+
+    return Connection
 end
 
-function MODULE.NEWOPTION(FUNCTION, INTERVAL)
-    INTERVAL = INTERVAL or 0.1
 
-    local ELAPSED = 0
+function MODULE.NEWOPTION(Callback, Interval)
+    Interval = Interval or 0.1
 
-    return MODULE.CONNECT(HEARTBEAT, function(DELTA)
-        ELAPSED += DELTA
+    local Option = {
+        Callback = Callback,
+        Interval = Interval,
+        Time = 0,
+        Enabled = true,
+        Busy = false
+    }
 
-        if ELAPSED < INTERVAL then
-            return
-        end
+    table.insert(MODULE.OPTIONS, Option)
 
-        ELAPSED = 0
+    return Option
+end
 
-        if FUNCTION then
-            local SUCCESS, ERROR = pcall(FUNCTION)
 
-            if not SUCCESS then
-                warn(ERROR)
+MODULE.CONNECT(RunService.Heartbeat, function(DeltaTime)
+
+    for I = 1, #MODULE.OPTIONS do
+
+        local Option = MODULE.OPTIONS[I]
+
+        if Option.Enabled and not Option.Busy then
+
+            Option.Time += DeltaTime
+
+            if Option.Time >= Option.Interval then
+
+                Option.Time = 0
+                Option.Busy = true
+
+                task.spawn(function()
+
+                    local Success, Error = pcall(Option.Callback)
+
+                    if not Success then
+                        warn(Error)
+                    end
+
+                    Option.Busy = false
+
+                end)
+
             end
         end
-    end)
-end
+    end
+
+end)
 
 return MODULE
